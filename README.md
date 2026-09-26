@@ -143,12 +143,26 @@ hold no business logic.
 
 **Requirements:** Xcode 16 or later, iOS 17+ device or simulator.
 
-On an **Intel Mac**, Xcode 26 is the newest usable release — Xcode 27 requires
-macOS Tahoe 26.6+, and Tahoe dropped Intel support entirely. Xcode 26 itself
-needs macOS Sequoia 15.6 or later. If the Mac App Store offers only a version
-that won't install, get Xcode 26 from
+### Picking an Xcode version on an Intel Mac
+
+**Xcode 26.3 is the last release that runs on an Intel Mac.** The macOS floor
+rises mid-series, which is easy to miss:
+
+| Xcode | Minimum macOS | Runs on Intel? |
+|---|---|---|
+| 27.x | Tahoe 26.6+ | no |
+| 26.4.1 – 26.6 | Tahoe 26.2+ | no |
+| **26.3** | **Sequoia 15.6 – Tahoe 26.x** | **yes** |
+| 26.0 – 26.2 | Sequoia 15.6 – Tahoe 26.x | yes |
+
+Anything requiring macOS Tahoe is Apple-silicon-only, because Tahoe dropped
+Intel support entirely. Xcode 26.3 ships the iOS 26.2 SDK, which builds this
+project's iOS 17 deployment target without trouble.
+
+The Mac App Store only offers the newest release, so on Intel you must download
+26.3 directly from
 [developer.apple.com/download/all](https://developer.apple.com/download/all/)
-(free Apple ID required).
+(free Apple ID required). Take the release `.xip`, not a beta.
 
 > The project pins `SWIFT_VERSION = 5.0`. Xcode 26 defaults new projects to
 > Swift 6 language mode, where the concurrency rules this code relies on become
