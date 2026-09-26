@@ -164,6 +164,24 @@ The Mac App Store only offers the newest release, so on Intel you must download
 [developer.apple.com/download/all](https://developer.apple.com/download/all/)
 (free Apple ID required). Take the release `.xip`, not a beta.
 
+Apple ships **two** `.xip` variants per release. Choose **Universal** — the
+Apple-silicon build will not launch on an Intel Mac. Verify after installing,
+because this is a known failure mode:
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app
+xcodebuild -version                                    # expect Xcode 26.3
+lipo -archs /Applications/Xcode.app/Contents/MacOS/Xcode
+```
+
+The last command must include `x86_64`. If it prints only `arm64`, the
+Apple-silicon variant was installed and Xcode will not run.
+
+Note that Xcode 26 no longer bundles simulator runtimes — the iOS simulator is
+a separate download on first launch. This project is best tested on a real
+iPhone regardless; the simulator's photo library is synthetic and
+`AVURLAsset`-backed file sizes behave differently there.
+
 > The project pins `SWIFT_VERSION = 5.0`. Xcode 26 defaults new projects to
 > Swift 6 language mode, where the concurrency rules this code relies on become
 > hard errors rather than warnings. Staying in Swift 5 mode is deliberate; move
