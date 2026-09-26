@@ -205,7 +205,7 @@ All three states are handled as first-class:
 xcodebuild test -scheme RECLAIM -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
 
-**Unit tests** (`RECLAIMTests`, ~70 cases) cover the pure logic:
+**Unit tests** (`RECLAIMTests`, 78 cases) cover the pure logic:
 storage calculations, perceptual fingerprinting and clustering, keep-suggestion
 scoring, contact normalisation and duplicate scoring, selection and reclaimable
 byte maths, scan-progress arithmetic, outcome reporting.
