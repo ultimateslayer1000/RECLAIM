@@ -141,8 +141,19 @@ hold no business logic.
 
 ## Setup
 
-**Requirements:** Xcode 16+, iOS 17+ device or simulator. (On an Intel Mac, the
-last supported version is Xcode 16.2.)
+**Requirements:** Xcode 16 or later, iOS 17+ device or simulator.
+
+On an **Intel Mac**, Xcode 26 is the newest usable release — Xcode 27 requires
+macOS Tahoe 26.6+, and Tahoe dropped Intel support entirely. Xcode 26 itself
+needs macOS Sequoia 15.6 or later. If the Mac App Store offers only a version
+that won't install, get Xcode 26 from
+[developer.apple.com/download/all](https://developer.apple.com/download/all/)
+(free Apple ID required).
+
+> The project pins `SWIFT_VERSION = 5.0`. Xcode 26 defaults new projects to
+> Swift 6 language mode, where the concurrency rules this code relies on become
+> hard errors rather than warnings. Staying in Swift 5 mode is deliberate; move
+> to Swift 6 only after the first clean build.
 
 ```bash
 git clone <your-repo-url>
