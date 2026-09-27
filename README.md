@@ -8,24 +8,34 @@ explicitly approve. Everything runs on-device. Nothing is ever uploaded.
 
 ---
 
-> ### Build status — read this first
+> ### Verification status — read this first
 >
-> The source is complete and syntax-verified, but **it has not been compiled**.
-> It was written on a machine with no Xcode installed (Command Line Tools only,
-> so no iOS SDK, no simulator, no `xcodebuild`). Validation performed:
+> Built and run with **Xcode 26.3** against the **iOS 26.2 SDK**.
 >
-> | Check | Tool | Result |
-> |---|---|---|
-> | Swift syntax, all 51 files | `swiftc -parse` | passes |
-> | Project file is a valid plist | `plutil -lint` | passes |
-> | No dangling object references | custom graph validator | passes |
-> | Scheme is well-formed XML | `xmllint` | passes |
-> | Type checking, API usage | — | **not verified** |
-> | Runtime behaviour on device | — | **not verified** |
+> | Check | Result |
+> |---|---|
+> | App target compiles | ✅ **zero errors, zero warnings** |
+> | Unit + integration tests | ✅ **89 executed, 0 failures, 1 skipped** |
+> | Launches on simulator | ✅ no crashes |
+> | Storage dashboard reads real volume | ✅ verified |
+> | Info.plist permission strings | ✅ iOS displayed them verbatim |
+> | **Exact duplicate detection** | ✅ **verified against planted fixtures** |
+> | **No false-positive grouping** | ✅ **verified** |
+> | Reclaimable byte maths | ✅ matches hand calculation |
+> | Empty states | ✅ verified |
+> | **Similar-photo detection (Vision)** | ⚠️ **cannot run in Simulator — needs a real iPhone** |
+> | Screenshot detection | ⚠️ not testable in Simulator (see below) |
+> | Contacts detection | ⚠️ Simulator address book is empty |
+> | Deletion, merging, cleanup | ⚠️ **never executed — real-device only** |
 >
-> Expect to fix compile errors on the first build. See
-> [Known limitations](#known-limitations) for the specific areas most likely to
-> need attention.
+> The one skipped test is the Vision clustering assertion, which skips
+> deliberately rather than passing vacuously. See
+> [Known limitations](#known-limitations).
+>
+> **Nothing has ever been deleted by this app.** The deletion path is written
+> and reviewed but has not been executed even once, on any device. Treat the
+> first real cleanup as the genuine test of it, and run it on items you are
+> willing to lose.
 
 ---
 
@@ -248,7 +258,29 @@ All three states are handled as first-class:
 xcodebuild test -scheme RECLAIM -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
 
-**Unit tests** (`RECLAIMTests`, 78 cases) cover the pure logic:
+### Verifying the scan against known data
+
+The integration suite asserts against fixtures with deliberately planted
+duplicate relationships, so results are pass/fail rather than impressionistic:
+
+```bash
+python3 Scripts/make_test_photos.py
+xcrun simctl boot "iPhone 16e"
+xcrun simctl addmedia booted /tmp/reclaim-fixtures/*.png
+xcodebuild test -scheme RECLAIM \
+  -destination 'platform=iOS Simulator,name=iPhone 16e' \
+  -only-testing:RECLAIMTests
+```
+
+Grant photo access once by launching the app and tapping *Allow Full Access* —
+a unit test cannot dismiss the system permission dialog, so the suite skips with
+an explanatory message until you do.
+
+Ground truth: 3 byte-identical copies must form one group, 2 more must form a
+separate group, 4 re-framed shots should cluster via Vision, and 3 unrelated
+scenes must not be grouped with anything.
+
+**Unit tests** (`RECLAIMTests`, 89 cases) cover the pure logic:
 storage calculations, perceptual fingerprinting and clustering, keep-suggestion
 scoring, contact normalisation and duplicate scoring, selection and reclaimable
 byte maths, scan-progress arithmetic, outcome reporting.
@@ -325,12 +357,29 @@ every 24-hex-char string resolves. Now memoised by key.
 
 Things that are genuinely unfinished or unverified, stated plainly:
 
-- **Never compiled.** No Xcode on the authoring machine. Type errors are likely
-  on first build.
-- **`SimilarityTuning.featureDistanceThreshold` needs calibration.** Set to 0.5
-  for feature-print revision 2. Apple doesn't document the distance scale, so
-  this is an educated starting point that must be tuned against a real library.
-  It's isolated in one struct precisely so tuning is a one-line change.
+- **Similar-photo detection has never successfully run.** In the Simulator,
+  `VNGenerateImageFeaturePrintRequest` fails with *"Failed to create espresso
+  context"* — the neural-network runtime behind Vision is unavailable there, on
+  every architecture, and Apple documents this as expected. The request itself
+  is correct (`supportedRevisions` lists both revisions; the default resolves to
+  2), but it can only be verified on a physical device. The app now detects this
+  and says so rather than implying the library is clean.
+- **`SimilarityTuning.featureDistanceThreshold` is still uncalibrated.** Set to
+  0.5 for feature-print revision 2. Apple doesn't document the distance scale,
+  and because Vision cannot run in the Simulator, **no real distance value has
+  ever been observed**. This is the first thing to tune on a device — run
+  `ScanIntegrationTests` there and the clustering test will report actual
+  distances. It is isolated in one struct so tuning is a one-line change.
+- **The deletion path has never executed.** `CleanupService` is written to
+  re-verify every removal by re-reading the library, and the Review gate is
+  covered by unit tests at the selection level, but no photo or contact has ever
+  actually been deleted by this code.
+- **Screenshot detection is unverified.** `PHAssetMediaSubtype.photoScreenshot`
+  is set by iOS when the OS captures a screenshot; images injected with
+  `simctl addmedia` never carry it, so the Simulator cannot exercise this path.
+- **Contact duplicate detection is unverified end-to-end.** The matching
+  algorithm has thorough unit coverage, but the Simulator address book is empty
+  and no real `CNContactStore` fetch has been exercised.
 - **Still-image sizes are estimates.** Derived from pixel count at ~0.30
   bytes/pixel (0.20 for screenshots). Deliberately conservative. Reading true
   sizes would mean touching every backing file, which is far too slow mid-scan.
