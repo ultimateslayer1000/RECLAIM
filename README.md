@@ -25,9 +25,10 @@ explicitly approve. Everything runs on-device. Nothing is ever uploaded.
 > | Empty states | ✅ verified |
 > | **Similar-photo detection (Vision)** | ✅ **verified on device** — groups judged accurate |
 > | Scan performance | ✅ ~30s on a real library, UI responsive |
-> | Screenshot detection | ⚠️ not verified |
-> | Contacts detection | ⚠️ not verified |
-> | Deletion, merging, cleanup | ⚠️ **never executed** |
+> | Screenshot detection | ✅ verified on device |
+> | **Deletion** | ✅ **executed on device — photo removed** |
+> | Contact duplicate detection | ⚠️ not verified against a real address book |
+> | Contact merge / delete | ⚠️ never executed |
 >
 > Device verification: iPhone on iOS 26.6.2, Xcode 26.3, free Personal Team.
 > Vision fails in *every* Simulator with "Failed to create espresso context" —
@@ -39,10 +40,14 @@ explicitly approve. Everything runs on-device. Nothing is ever uploaded.
 > deliberately rather than passing vacuously. See
 > [Known limitations](#known-limitations).
 >
-> **Nothing has ever been deleted by this app.** The deletion path is written
-> and reviewed but has not been executed even once, on any device. Treat the
-> first real cleanup as the genuine test of it, and run it on items you are
-> willing to lose.
+> The **photo** deletion path has been exercised end to end on a real device: an
+> asset was selected, reviewed, confirmed, deleted and verified gone.
+>
+> The **contact** deletion and merge paths have still never executed. They are
+> written to the same pattern — frozen plan, explicit confirmation, re-read to
+> verify — but that is an argument from symmetry, not evidence. Unlike photos,
+> deleted contacts are not recoverable from within iOS, so treat the first real
+> contact cleanup with corresponding care.
 
 ---
 
