@@ -65,6 +65,32 @@ final class NormalizationTests: XCTestCase {
         XCTAssertEqual(NameNormalizer.normalize("José  O'Brien-Smith"), "jose obrien smith")
     }
 
+    func testApostropheSpellingsMatch() {
+        // The point of eliding apostrophes: these are the same surname, and a
+        // real address book will contain both spellings for one person.
+        XCTAssertEqual(
+            NameNormalizer.sortedKey(given: "Sean", family: "O'Brien"),
+            NameNormalizer.sortedKey(given: "Sean", family: "OBrien")
+        )
+        XCTAssertEqual(
+            NameNormalizer.sortedKey(given: "Sean", family: "O’Brien"),  // curly
+            NameNormalizer.sortedKey(given: "Sean", family: "O'Brien")   // straight
+        )
+    }
+
+    func testInitialsWithPeriodsMatchWithoutThem() {
+        XCTAssertEqual(
+            NameNormalizer.sortedKey(given: "J.R.R.", family: "Tolkien"),
+            NameNormalizer.sortedKey(given: "JRR", family: "Tolkien")
+        )
+    }
+
+    func testHyphensStillSeparateNameParts() {
+        // Hyphens are separators, not elided marks — a double-barrelled surname
+        // is genuinely two tokens.
+        XCTAssertEqual(NameNormalizer.normalize("Brien-Smith"), "brien smith")
+    }
+
     func testSortedKeyMakesNameOrderIrrelevant() {
         XCTAssertEqual(
             NameNormalizer.sortedKey(given: "Ronit", family: "Ladkat"),

@@ -59,15 +59,26 @@ enum EmailNormalizer {
 /// Name normalisation: case-folded, diacritic-stripped, punctuation-free,
 /// whitespace-collapsed. "José  O'Brien-Smith" → "jose obriensmith".
 enum NameNormalizer {
+
+    /// Marks deleted outright rather than treated as separators.
+    ///
+    /// An apostrophe sits *inside* a word: "O'Brien" and "OBrien" are the same
+    /// surname, so replacing it with a space would split one token into two and
+    /// stop the two spellings matching. Periods behave the same way in
+    /// initialisms ("J.R.R." → "jrr"). Hyphens deliberately are *not* here —
+    /// "Brien-Smith" really is two name parts and should tokenise as two.
+    private static let elidedMarks = CharacterSet(charactersIn: "'\u{2019}\u{02BC}`.")
+
     static func normalize(_ raw: String) -> String {
         let folded = raw.folding(options: [.diacriticInsensitive, .caseInsensitive],
                                  locale: Locale(identifier: "en_US_POSIX"))
-        let cleaned = folded.unicodeScalars
-            .map { scalar -> Character in
-                if CharacterSet.alphanumerics.contains(scalar) { return Character(scalar) }
-                return " "
-            }
-        return String(cleaned)
+        let space: Unicode.Scalar = " "
+        var scalars = String.UnicodeScalarView()
+        for scalar in folded.unicodeScalars {
+            if elidedMarks.contains(scalar) { continue }
+            scalars.append(CharacterSet.alphanumerics.contains(scalar) ? scalar : space)
+        }
+        return String(scalars)
             .split(separator: " ", omittingEmptySubsequences: true)
             .joined(separator: " ")
     }

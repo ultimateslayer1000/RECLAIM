@@ -64,11 +64,19 @@ final class FingerprintTests: XCTestCase {
 
     func testFingerprintSurvivesRescaling() throws {
         // A resized copy of the same picture should still be recognised.
+        //
+        // The intermediate values are explicitly typed: left to infer them,
+        // Swift's type checker times out choosing overloads for the mixed
+        // integer arithmetic inside these closures.
         let large = try XCTUnwrap(makeImage(width: 256, height: 256) { x, y in
-            UInt8(((x / 4) * 7 + (y / 4) * 11) % 256)
+            let sx: Int = x / 4
+            let sy: Int = y / 4
+            let value: Int = (sx * 7 + sy * 11) % 256
+            return UInt8(value)
         })
         let small = try XCTUnwrap(makeImage(width: 64, height: 64) { x, y in
-            UInt8((x * 7 + y * 11) % 256)
+            let value: Int = (x * 7 + y * 11) % 256
+            return UInt8(value)
         })
         let a = try XCTUnwrap(FingerprintGenerator.fingerprint(from: large))
         let b = try XCTUnwrap(FingerprintGenerator.fingerprint(from: small))
@@ -81,7 +89,10 @@ final class FingerprintTests: XCTestCase {
 
     func testDifferentImagesProduceDifferentFingerprints() throws {
         let gradient = try XCTUnwrap(makeImage { x, _ in UInt8(x * 4 % 256) })
-        let inverse = try XCTUnwrap(makeImage { x, _ in UInt8(255 - (x * 4 % 256)) })
+        let inverse = try XCTUnwrap(makeImage { x, _ in
+            let value: Int = 255 - (x * 4 % 256)
+            return UInt8(value)
+        })
         let a = try XCTUnwrap(FingerprintGenerator.fingerprint(from: gradient))
         let b = try XCTUnwrap(FingerprintGenerator.fingerprint(from: inverse))
         XCTAssertGreaterThan(a.hammingDistance(to: b),

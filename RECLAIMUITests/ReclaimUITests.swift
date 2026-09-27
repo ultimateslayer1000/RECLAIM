@@ -35,7 +35,7 @@ final class ReclaimUITests: XCTestCase {
 
     // MARK: - Onboarding
 
-    func testOnboardingExplainsBeforeRequestingPermission() {
+    func testOnboardingExplainsBeforeRequestingPermission() throws {
         let getStarted = app.buttons["Get started"]
         guard getStarted.waitForExistence(timeout: 5) else {
             throw XCTSkip("Onboarding already completed on this device")
@@ -63,7 +63,7 @@ final class ReclaimUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Not now"].exists)
     }
 
-    func testOnboardingCanBeCompletedWithoutGrantingAnything() {
+    func testOnboardingCanBeCompletedWithoutGrantingAnything() throws {
         let getStarted = app.buttons["Get started"]
         guard getStarted.waitForExistence(timeout: 5) else {
             throw XCTSkip("Onboarding already completed on this device")
