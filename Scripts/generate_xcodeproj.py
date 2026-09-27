@@ -21,6 +21,12 @@ PROJECT_NAME = "RECLAIM"
 # automatic signing with a confusing error at install time rather than build
 # time. The test bundles derive from this (".tests", ".uitests").
 BUNDLE_ID = "com.ronitladkat.reclaim"
+
+# Apple Development team ID used for automatic signing. Emitted here so that
+# regenerating the project does not wipe the team Xcode wrote into the pbxproj,
+# which would otherwise mean re-picking it in the UI after every run.
+# Replace with your own (Signing & Capabilities → Team) if you fork this.
+DEVELOPMENT_TEAM = "64UBKDVQ24"
 DEPLOYMENT_TARGET = "17.0"
 SWIFT_VERSION = "5.0"
 
@@ -496,6 +502,7 @@ def main():
         ("ASSETCATALOG_COMPILER_APPICON_NAME", "AppIcon"),
         ("ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME", "Accent"),
         ("CODE_SIGN_STYLE", "Automatic"),
+        ("DEVELOPMENT_TEAM", DEVELOPMENT_TEAM),
         ("CURRENT_PROJECT_VERSION", "1"),
         ("DEVELOPMENT_ASSET_PATHS", "\"\""),
         ("ENABLE_PREVIEWS", "YES"),
@@ -520,6 +527,7 @@ def main():
     test_common = [
         ("BUNDLE_LOADER", "\"$(TEST_HOST)\""),
         ("CODE_SIGN_STYLE", "Automatic"),
+        ("DEVELOPMENT_TEAM", DEVELOPMENT_TEAM),
         ("CURRENT_PROJECT_VERSION", "1"),
         ("GENERATE_INFOPLIST_FILE", "YES"),
         ("MARKETING_VERSION", "1.0"),
@@ -534,6 +542,7 @@ def main():
 
     uitest_common = [
         ("CODE_SIGN_STYLE", "Automatic"),
+        ("DEVELOPMENT_TEAM", DEVELOPMENT_TEAM),
         ("CURRENT_PROJECT_VERSION", "1"),
         ("GENERATE_INFOPLIST_FILE", "YES"),
         ("MARKETING_VERSION", "1.0"),

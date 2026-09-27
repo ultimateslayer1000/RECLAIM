@@ -23,10 +23,17 @@ explicitly approve. Everything runs on-device. Nothing is ever uploaded.
 > | **No false-positive grouping** | ✅ **verified** |
 > | Reclaimable byte maths | ✅ matches hand calculation |
 > | Empty states | ✅ verified |
-> | **Similar-photo detection (Vision)** | ⚠️ **cannot run in Simulator — needs a real iPhone** |
-> | Screenshot detection | ⚠️ not testable in Simulator (see below) |
-> | Contacts detection | ⚠️ Simulator address book is empty |
-> | Deletion, merging, cleanup | ⚠️ **never executed — real-device only** |
+> | **Similar-photo detection (Vision)** | ✅ **verified on device** — groups judged accurate |
+> | Scan performance | ✅ ~30s on a real library, UI responsive |
+> | Screenshot detection | ⚠️ not verified |
+> | Contacts detection | ⚠️ not verified |
+> | Deletion, merging, cleanup | ⚠️ **never executed** |
+>
+> Device verification: iPhone on iOS 26.6.2, Xcode 26.3, free Personal Team.
+> Vision fails in *every* Simulator with "Failed to create espresso context" —
+> similar-photo detection is only testable on real hardware, where it works.
+> `SimilarityTuning.featureDistanceThreshold = 0.5` was judged correct against a
+> real library; don't change it without new evidence.
 >
 > The one skipped test is the Vision clustering assertion, which skips
 > deliberately rather than passing vacuously. See
