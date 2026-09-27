@@ -103,6 +103,12 @@ actor ScanEngine {
 
             guard !Task.isCancelled else { return finish(&results) }
 
+            // If every asset analysed but not one produced a feature print, the
+            // Vision runtime is unavailable rather than the library being free
+            // of similar photos. Record it so the UI can say which it is.
+            results.similarDetectionUnavailable =
+                !analyses.isEmpty && analyses.allSatisfy { $0.featurePrint == nil }
+
             report(.findingSimilar, 0.3, processed: total, total: total)
             results.similarGroups = await similarity.buildGroups(
                 analyses: analyses, candidates: candidateIndex

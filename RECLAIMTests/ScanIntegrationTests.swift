@@ -1,4 +1,5 @@
 import Photos
+import Vision
 import XCTest
 @testable import RECLAIM
 
@@ -124,6 +125,74 @@ final class ScanIntegrationTests: XCTestCase {
                        "Every asset should produce an analysis")
     }
 
+    /// Surfaces the error `PhotoAnalyzer.featurePrint` swallows.
+    ///
+    /// Production code returns nil on failure so one bad asset cannot abort a
+    /// whole scan — but that also hides *why* Vision failed. This reproduces
+    /// the call with the error printed.
+    func testDiagnoseVisionFeaturePrint() async throws {
+        _ = try await prepare()
+        let assets = PhotoLibraryService().assetObjects(mediaType: .image)
+        let first = try XCTUnwrap(assets.first)
+        // `XCTUnwrap` takes an autoclosure, which cannot contain `await`, so the
+        // async call is hoisted out.
+        let loaded = await ThumbnailProvider.shared.analysisImage(for: first)
+        let image = try XCTUnwrap(loaded)
+        let cg = try XCTUnwrap(image.cgImage)
+        print("── input image: \(cg.width)x\(cg.height)")
+
+        print("── supportedRevisions: \(VNGenerateImageFeaturePrintRequest.supportedRevisions)")
+        print("── Revision1 = \(VNGenerateImageFeaturePrintRequestRevision1), "
+              + "Revision2 = \(VNGenerateImageFeaturePrintRequestRevision2)")
+
+        // Default revision, whatever the OS picks.
+        let defaultRequest = VNGenerateImageFeaturePrintRequest()
+        print("── default revision resolves to: \(defaultRequest.revision)")
+        do {
+            try VNImageRequestHandler(cgImage: cg, options: [:]).perform([defaultRequest])
+            let observation = defaultRequest.results?.first as? VNFeaturePrintObservation
+            print("── DEFAULT ok — results: \(defaultRequest.results?.count ?? -1), "
+                  + "elementCount: \(observation?.elementCount ?? -1)")
+        } catch {
+            print("── DEFAULT FAILED: \(error)")
+        }
+
+        // Explicitly pinned revision 2 — what production currently requests.
+        let pinned = VNGenerateImageFeaturePrintRequest()
+        pinned.revision = VNGenerateImageFeaturePrintRequestRevision2
+        do {
+            try VNImageRequestHandler(cgImage: cg, options: [:]).perform([pinned])
+            let observation = pinned.results?.first as? VNFeaturePrintObservation
+            print("── REVISION2 ok — results: \(pinned.results?.count ?? -1), "
+                  + "elementCount: \(observation?.elementCount ?? -1)")
+        } catch {
+            print("── REVISION2 FAILED: \(error)")
+        }
+
+        // And a distance computation between two different images, which is
+        // what the similarity pass actually depends on.
+        if assets.count > 1,
+           let second = await ThumbnailProvider.shared.analysisImage(for: assets[1]),
+           let cg2 = second.cgImage {
+            let a = VNGenerateImageFeaturePrintRequest()
+            let b = VNGenerateImageFeaturePrintRequest()
+            do {
+                try VNImageRequestHandler(cgImage: cg, options: [:]).perform([a])
+                try VNImageRequestHandler(cgImage: cg2, options: [:]).perform([b])
+                if let oa = a.results?.first as? VNFeaturePrintObservation,
+                   let ob = b.results?.first as? VNFeaturePrintObservation {
+                    var distance = Float(0)
+                    try oa.computeDistance(&distance, to: ob)
+                    print("── DISTANCE between asset 0 and 1: \(distance)")
+                } else {
+                    print("── DISTANCE: could not obtain both observations")
+                }
+            } catch {
+                print("── DISTANCE FAILED: \(error)")
+            }
+        }
+    }
+
     func testScanGroupsPlantedDuplicatesAndLeavesUniquesAlone() async throws {
         _ = try await prepare()
         let results = await runScan()
@@ -182,6 +251,43 @@ final class ScanIntegrationTests: XCTestCase {
                       "Byte-identical copies should be classified as exact duplicates")
         XCTAssertTrue(namesInDuplicateGroups.contains("dupB_0.png"),
                       "Byte-identical copies should be classified as exact duplicates")
+    }
+
+    /// The four re-framed shots of one scene should cluster via Vision.
+    ///
+    /// Skips — rather than silently reporting — when the Vision runtime is
+    /// unavailable. That is the documented Simulator behaviour ("Failed to
+    /// create espresso context"), so this assertion can only be satisfied on a
+    /// real device. An earlier version of this test merely *printed* the
+    /// grouping, which let a total Vision failure pass as success.
+    func testSimilarFramesClusterTogether() async throws {
+        _ = try await prepare()
+        let results = await runScan()
+
+        try XCTSkipIf(
+            results.similarDetectionUnavailable,
+            "Vision feature prints unavailable on this device (Simulator limitation) — "
+                + "similar-photo clustering must be verified on a real iPhone."
+        )
+
+        var groupOf: [String: String] = [:]
+        for group in results.similarGroups {
+            for member in group.members where isFixture(member.id) {
+                groupOf[name(member.id)] = group.id
+            }
+        }
+
+        let similarGroups = Set(
+            (0..<4).compactMap { groupOf["similar_\($0).png"] }
+        )
+        XCTAssertEqual(similarGroups.count, 1,
+                       "The four re-framed shots of one scene should form a single group")
+
+        // Still the property that matters most: no false positives.
+        for unique in ["unique_0.png", "unique_1.png", "unique_2.png"] {
+            XCTAssertNil(groupOf[unique],
+                         "\(unique) must not be pulled into a similar group")
+        }
     }
 
     func testSuggestedKeepIsAlwaysAMemberAndNeverEveryPhoto() async throws {

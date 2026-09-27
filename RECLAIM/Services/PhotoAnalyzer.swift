@@ -117,6 +117,19 @@ actor PhotoAnalyzer {
             }
             return FeaturePrint(observation: observation)
         } catch {
+            // Returning nil rather than throwing is deliberate: one unreadable
+            // asset must not abort an entire scan. But swallowing the reason
+            // silently hid a total failure during development, so the error is
+            // logged in debug builds.
+            //
+            // The expected failure here is "Failed to create espresso context",
+            // which means the neural-network runtime backing Vision is
+            // unavailable. That is the documented behaviour in the Simulator on
+            // every architecture — similar-photo detection can only be verified
+            // on a real device.
+            #if DEBUG
+            print("[RECLAIM] Vision feature print unavailable: \(error.localizedDescription)")
+            #endif
             return nil
         }
     }

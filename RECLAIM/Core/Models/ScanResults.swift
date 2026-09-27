@@ -11,6 +11,18 @@ struct ScanResults: Sendable, Equatable {
 
     /// Set when Photos access was limited, so the UI can say so honestly.
     var photoAccessWasLimited: Bool = false
+
+    /// True when photos were analysed but Vision produced no feature prints at
+    /// all — meaning similar-photo detection could not run and only exact
+    /// duplicates were found.
+    ///
+    /// This happens when the neural-network runtime behind Vision is
+    /// unavailable (notably in the Simulator, which fails with "Failed to
+    /// create espresso context"). Surfacing it is a correctness requirement:
+    /// showing an empty Similar Photos screen without explanation would imply
+    /// the library is clean when the feature simply never ran.
+    var similarDetectionUnavailable: Bool = false
+
     var scannedAssetCount: Int = 0
     var completedAt: Date?
 

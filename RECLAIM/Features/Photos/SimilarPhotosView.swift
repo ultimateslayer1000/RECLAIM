@@ -35,7 +35,14 @@ struct SimilarPhotosView: View {
                             message: "We compared every photo RECLAIM can see and didn't find near-identical shots. Your library is already tidy."
                         )
                     }
+                    // Never claim a clean library when the comparison never ran.
+                    if model.results.similarDetectionUnavailable {
+                        similarUnavailableNote
+                    }
                 } else {
+                    if model.results.similarDetectionUnavailable {
+                        similarUnavailableNote
+                    }
                     header
                     ForEach(model.results.similarGroups) { group in
                         SimilarGroupCard(group: group)
@@ -46,6 +53,30 @@ struct SimilarPhotosView: View {
             }
             .padding(Theme.Space.md)
         }
+    }
+
+    /// Shown when Vision could not run. Distinguishes "we looked and found
+    /// nothing" from "we could not look" — the two are very different claims to
+    /// make to someone deciding what to delete.
+    private var similarUnavailableNote: some View {
+        HStack(alignment: .top, spacing: Theme.Space.xs) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.footnote)
+                .foregroundStyle(Theme.Palette.destructive)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Similar-photo detection didn't run")
+                    .font(Theme.Typography.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.Palette.ink)
+                Text("This device couldn't start the on-device image analysis engine, so only exact duplicates were checked. Any results below are exact copies only.")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Palette.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(Theme.Space.sm)
+        .background(Theme.Palette.destructive.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     private var header: some View {
