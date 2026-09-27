@@ -137,17 +137,60 @@ actor VideoService {
 
     // MARK: - Bridging
 
+    /// Seconds to wait for one AVAsset before giving up and estimating instead.
+    static let requestTimeout: TimeInterval = 8
+
     private static func requestAVAsset(
         for asset: PHAsset,
         manager: PHImageManager,
         options: PHVideoRequestOptions
     ) async -> AVAsset? {
-        let box = AVResumeBox()
-        return await withCheckedContinuation { (continuation: CheckedContinuation<AVAsset?, Never>) in
-            manager.requestAVAsset(forVideo: asset, options: options) { avAsset, _, _ in
-                if box.claim() { continuation.resume(returning: avAsset) }
+        // Raced against a timeout for the same reason as image requests:
+        // `PHImageManager` is not guaranteed to invoke its handler, and a
+        // continuation that never resumes would suspend this task forever,
+        // stalling the whole scan. iCloud-resident videos are the likely
+        // trigger. On timeout we fall back to a bitrate estimate, which the UI
+        // already labels as such.
+        await withTaskGroup(of: AVAsset?.self) { group in
+            let requestID = AVRequestIDBox()
+
+            group.addTask {
+                let box = AVResumeBox()
+                return await withCheckedContinuation { (continuation: CheckedContinuation<AVAsset?, Never>) in
+                    let id = manager.requestAVAsset(forVideo: asset, options: options) { avAsset, _, _ in
+                        if box.claim() { continuation.resume(returning: avAsset) }
+                    }
+                    requestID.set(id)
+                }
             }
+
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(requestTimeout * 1_000_000_000))
+                // Cancelling makes Photos fire the handler, releasing the
+                // sibling task rather than leaving it suspended.
+                if let id = requestID.get() { manager.cancelImageRequest(id) }
+                return nil
+            }
+
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
         }
+    }
+}
+
+private final class AVRequestIDBox: @unchecked Sendable {
+    private var id: PHImageRequestID?
+    private let lock = NSLock()
+
+    func set(_ value: PHImageRequestID) {
+        lock.lock(); defer { lock.unlock() }
+        id = value
+    }
+
+    func get() -> PHImageRequestID? {
+        lock.lock(); defer { lock.unlock() }
+        return id
     }
 }
 

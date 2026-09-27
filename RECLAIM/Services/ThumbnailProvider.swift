@@ -124,32 +124,86 @@ final class ThumbnailProvider: @unchecked Sendable {
 
     // MARK: - Bridging PHImageManager to async/await
 
+    /// Seconds to wait for one image before giving up on it.
+    ///
+    /// Generous enough that a slow local decode still succeeds, short enough
+    /// that a handful of unresponsive assets cannot add minutes to a scan.
+    static let requestTimeout: TimeInterval = 8
+
     private func requestImage(
         asset: PHAsset,
         size: CGSize,
         options: PHImageRequestOptions
     ) async -> UIImage? {
-        // PHImageManager can invoke its handler more than once (a degraded
-        // placeholder followed by the final image). A continuation may only be
-        // resumed once, so the first non-degraded result wins and everything
-        // afterwards is ignored.
-        let box = ResumeBox()
-        return await withCheckedContinuation { (continuation: CheckedContinuation<UIImage?, Never>) in
-            manager.requestImage(
-                for: asset,
-                targetSize: size,
-                contentMode: .aspectFill,
-                options: options
-            ) { image, info in
-                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
-                let isCancelled = (info?[PHImageCancelledKey] as? Bool) ?? false
-                let failed = info?[PHImageErrorKey] != nil
+        // A bare continuation here is a liveness hazard.
+        //
+        // `PHImageManager` does not guarantee it will ever invoke the handler —
+        // observed on a real device with iCloud-optimised photos, where some
+        // assets simply never call back. A continuation that never resumes
+        // suspends its task forever, and because the scan awaits every task in
+        // its group, ONE such asset freezes the entire scan permanently.
+        //
+        // So the request races a timeout. Whichever finishes first wins; on
+        // timeout the asset is skipped rather than taking the scan down with it.
+        await withTaskGroup(of: UIImage?.self) { group in
+            let manager = self.manager
+            let requestID = RequestIDBox()
 
-                // Keep waiting for the real image unless this is terminal.
-                if isDegraded && !isCancelled && !failed { return }
-                if box.claim() { continuation.resume(returning: image) }
+            group.addTask {
+                let box = ResumeBox()
+                return await withCheckedContinuation { (continuation: CheckedContinuation<UIImage?, Never>) in
+                    let id = manager.requestImage(
+                        for: asset,
+                        targetSize: size,
+                        contentMode: .aspectFill,
+                        options: options
+                    ) { image, info in
+                        let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                        let isCancelled = (info?[PHImageCancelledKey] as? Bool) ?? false
+                        let failed = info?[PHImageErrorKey] != nil
+
+                        // Keep waiting for the real image unless this is terminal.
+                        if isDegraded && !isCancelled && !failed { return }
+                        if box.claim() { continuation.resume(returning: image) }
+                    }
+                    requestID.set(id)
+                }
             }
+
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(Self.requestTimeout * 1_000_000_000))
+                // Cancelling makes Photos invoke the handler with
+                // PHImageCancelledKey, which resumes the stranded continuation.
+                // Without this the sibling task would stay suspended forever
+                // even though we have stopped waiting on it.
+                if let id = requestID.get() { manager.cancelImageRequest(id) }
+                #if DEBUG
+                print("[RECLAIM] image request timed out after \(Self.requestTimeout)s — skipping asset")
+                #endif
+                return nil
+            }
+
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
         }
+    }
+}
+
+/// Holds a `PHImageRequestID` so the timeout branch can cancel the outstanding
+/// request. Lock-guarded because it is written and read from different tasks.
+private final class RequestIDBox: @unchecked Sendable {
+    private var id: PHImageRequestID?
+    private let lock = NSLock()
+
+    func set(_ value: PHImageRequestID) {
+        lock.lock(); defer { lock.unlock() }
+        id = value
+    }
+
+    func get() -> PHImageRequestID? {
+        lock.lock(); defer { lock.unlock() }
+        return id
     }
 }
 
