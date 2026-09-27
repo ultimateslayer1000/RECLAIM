@@ -27,7 +27,7 @@ explicitly approve. Everything runs on-device. Nothing is ever uploaded.
 > | Scan performance | ✅ ~30s on a real library, UI responsive |
 > | Screenshot detection | ✅ verified on device |
 > | **Deletion** | ✅ **executed on device — photo removed** |
-> | Contact duplicate detection | ⚠️ not verified against a real address book |
+> | Contact duplicate detection | ✅ verified against a real address book |
 > | Contact merge / delete | ⚠️ never executed |
 >
 > Device verification: iPhone on iOS 26.6.2, Xcode 26.3, free Personal Team.
