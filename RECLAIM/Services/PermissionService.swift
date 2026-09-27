@@ -1,6 +1,10 @@
 import Contacts
 import Foundation
 import Photos
+// `presentLimitedLibraryPicker(from:)` is vended by PhotosUI, not Photos — it
+// presents a UIKit controller, so it lives in the UI-layer framework as an
+// extension on PHPhotoLibrary.
+import PhotosUI
 import UIKit
 
 /// Normalised permission state shared by both frameworks.
@@ -93,10 +97,18 @@ final class PermissionService {
         case .restricted:    return .restricted
         case .denied:        return .denied
         case .authorized:    return .granted
-        @unknown default:
-            // iOS 18 adds `.limited` for contacts. RECLAIM targets iOS 17, and
-            // treating an unknown-but-present state as usable would be unsafe,
-            // so we degrade to denied and show the recovery UI.
+        default:
+            // `CNAuthorizationStatusLimited` is declared
+            // `NS_ENUM_AVAILABLE_IOS(18_0)`, so it cannot appear as a plain
+            // `case` while the deployment target is iOS 17 — it is matched here
+            // behind an availability check instead.
+            //
+            // Limited contacts access means the user shared a chosen subset of
+            // their address book. That is genuinely usable: we scan what we can
+            // see and say so, rather than pretending access was denied.
+            if #available(iOS 18.0, *), status == .limited { return .limited }
+            // A genuinely unrecognised future state. Treating an unknown value
+            // as usable would be unsafe, so degrade to the recovery UI.
             return .denied
         }
     }

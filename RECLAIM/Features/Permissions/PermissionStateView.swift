@@ -51,9 +51,13 @@ struct PermissionStateView: View {
             PrimaryButton(title: requestTitle) { onRequest?() }
         case .limited:
             VStack(spacing: Theme.Space.xs) {
-                SecondaryButton(title: "Select more photos",
-                                systemImage: "photo.badge.plus") {
-                    presentLimitedPicker()
+                // The in-app picker is a Photos-only affordance. Limited
+                // *contacts* access is widened through Settings instead.
+                if kind == .photos {
+                    SecondaryButton(title: "Select more photos",
+                                    systemImage: "photo.badge.plus") {
+                        presentLimitedPicker()
+                    }
                 }
                 SecondaryButton(title: "Open Settings", systemImage: "gear") {
                     model.permissions.openSettings()
@@ -95,7 +99,8 @@ struct PermissionStateView: View {
 
     private var title: String {
         switch state {
-        case .limited:    return "Limited Photo Access"
+        case .limited:    return kind == .photos ? "Limited Photo Access"
+                                                 : "Limited Contacts Access"
         case .denied:     return kind == .photos ? "Photo access is off" : "Contacts access is off"
         case .restricted: return "Access is restricted"
         default:          return kind == .photos ? "Photo access needed" : "Contacts access needed"
@@ -108,6 +113,8 @@ struct PermissionStateView: View {
             return "RECLAIM can only see the photos you've chosen to share, so duplicate, screenshot and video results cover just that selection."
         case (.photos, _):
             return "Duplicate photos, screenshots and large videos can't be scanned."
+        case (.contacts, .limited):
+            return "RECLAIM can only see the contacts you've chosen to share, so duplicate results cover just that selection."
         case (.contacts, _):
             return "Duplicate contacts can't be scanned. Photo features still work normally."
         }
