@@ -16,7 +16,11 @@ import shutil
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 PROJECT_NAME = "RECLAIM"
-BUNDLE_ID = "com.reclaim.app"
+# Reverse-DNS on a name you control. A generic id like "com.reclaim.app" is
+# likely already registered to someone else on Apple's servers, which fails
+# automatic signing with a confusing error at install time rather than build
+# time. The test bundles derive from this (".tests", ".uitests").
+BUNDLE_ID = "com.ronitladkat.reclaim"
 DEPLOYMENT_TARGET = "17.0"
 SWIFT_VERSION = "5.0"
 

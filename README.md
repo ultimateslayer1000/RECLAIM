@@ -225,7 +225,10 @@ differently. Use a real device.
 
 1. Connect the iPhone and trust the Mac.
 2. In Xcode: **Signing & Capabilities** → select your Team. The bundle
-   identifier defaults to `com.reclaim.app`; change it if that's taken.
+   identifier is `com.ronitladkat.reclaim` — change `BUNDLE_ID` in
+   `Scripts/generate_xcodeproj.py` and re-run it if you need a different one.
+   A free Apple ID ("Personal Team") is sufficient; apps signed that way expire
+   after 7 days and simply need rebuilding.
 3. Select your iPhone as the destination and press Run.
 4. On the device: **Settings → General → VPN & Device Management** → trust your
    developer certificate.
