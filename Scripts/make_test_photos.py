@@ -99,12 +99,18 @@ def main():
         write_png(path, scene_b)
         written.append(path)
 
-    # --- Group C: four near-identical frames (small shift + exposure drift),
-    #     the "same shot taken several times" case Vision should cluster ---
+    # --- Group C: four near-identical frames (re-framed + exposure drift),
+    #     the "same shot taken several times" case Vision should cluster.
+    #
+    #     The shift must be large enough to change the perceptual hash, or these
+    #     collapse into the exact-duplicate pass and never exercise Vision at
+    #     all: dHash reduces to a 9x8 grid, so on a 640px image one grid cell is
+    #     ~71px and a 3px shift is invisible to it. 40px per step moves roughly
+    #     half a cell per frame while keeping the scene obviously the same. ---
     for n in range(4):
         path = os.path.join(OUT, "similar_%d.png" % n)
-        write_png(path, render(seed=8.5, shift_x=n * 3, shift_y=n * 2,
-                               brightness=1.0 - n * 0.04))
+        write_png(path, render(seed=8.5, shift_x=n * 40, shift_y=n * 24,
+                               brightness=1.0 - n * 0.05))
         written.append(path)
 
     # --- Unrelated scenes: must NOT be grouped ---

@@ -37,11 +37,18 @@ final class ThumbnailProvider: @unchecked Sendable {
     /// Thumbnail for grid and row display.
     func thumbnail(for asset: PHAsset, targetSize: CGSize) async -> UIImage? {
         let options = PHImageRequestOptions()
-        options.deliveryMode = .opportunistic
+        // Deliberately not `.opportunistic`. That mode delivers a degraded
+        // placeholder first and a final image later, but nothing guarantees the
+        // second callback arrives — and since a continuation resumes exactly
+        // once, a missing final would strand the task permanently. One
+        // deterministic callback is worth more than a slightly faster first
+        // paint; `PHCachingImageManager` plus the prefetch window covers scroll
+        // performance instead.
+        options.deliveryMode = .highQualityFormat
         options.resizeMode = .fast
         options.isSynchronous = false
-        // Grid scrolling must never block on a network fetch. iCloud-only assets
-        // render from their local low-res placeholder instead.
+        // Grid scrolling must never block on a network fetch. iCloud-only
+        // assets fall back to the placeholder cell rather than downloading.
         options.isNetworkAccessAllowed = false
         return await requestImage(asset: asset, size: targetSize, options: options)
     }
@@ -65,11 +72,25 @@ final class ThumbnailProvider: @unchecked Sendable {
         if let cached = analysisCache.object(forKey: key) { return cached }
 
         let options = PHImageRequestOptions()
-        // `.fastFormat` returns a single result and never round-trips to iCloud,
-        // which is what keeps a 10k-asset scan bounded.
-        options.deliveryMode = .fastFormat
+        // `.highQualityFormat`, NOT `.fastFormat`.
+        //
+        // `.fastFormat` does not mean "decode quickly" — it means "return only a
+        // representation that already exists". Assets with no cached rendition
+        // (anything recently imported) fail outright with PHPhotosError 3303,
+        // "No resource found matching image request spec". That silently
+        // emptied the entire analysis stage.
+        //
+        // `.highQualityFormat` also delivers exactly one, non-degraded result,
+        // which matters for correctness as much as availability: hashing some
+        // assets from a degraded rendition and others from the full one would
+        // produce different fingerprints for identical images.
+        //
+        // The cost is bounded because the target size is only 128pt and
+        // PHCachingImageManager reuses the decode.
+        options.deliveryMode = .highQualityFormat
         options.resizeMode = .exact
         options.isSynchronous = false
+        // Still false: an iCloud-only asset is skipped rather than downloaded.
         options.isNetworkAccessAllowed = false
 
         guard let image = await requestImage(
